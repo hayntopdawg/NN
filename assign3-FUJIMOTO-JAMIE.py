@@ -67,35 +67,73 @@ class NN():
         # print 'wh: {0}'.format(self.wh)
 
 
-    def forward_feed(self, Xi):
+    def forward_feed(self, xi):
         # input activations
-        self.ai = np.append(Xi, 1)  # add bias node back
-        # print 'ai: {0}'.format(self.ai)
+        self.ai = np.append(xi, 1)  # add bias node back
+        # print 'ai ({0}): {1}'.format(self.ai.shape, self.ai)
+
+        # print 'wi: {0}'.format(self.wi)
 
         # hidden activations
-        ah = sigmoid(np.dot(self.ai.T, self.wi).T)
+        ah = sigmoid(np.dot(self.wi.T, self.ai))
         self.ah = np.append(ah, 1)  # add bias node back
-        # print 'ah: {0}'.format(self.ah)
+        # print 'ah ({0}): {1}'.format(self.ah.shape, self.ah)
+
+        # print 'wh: {0}'.format(self.wh)
 
         # output activations
-        self.ao = sigmoid(np.dot(self.ah.T, self.wh).T)
+        self.ao = sigmoid(np.dot(self.wh.T, self.ah))
         # print 'ao: {0}'.format(self.ao)
+        return self.ao
 
 
-    def back_propagate(self):
-        pass
+    def back_propagate(self, xi, yi, eta):
+        # calculate error terms for outputs
+        djo = (yi - self.ao) * self.ao * (1 - self.ao)
+        # print 'djo: {0}'.format(djo)
+
+        # calculate error terms for hidden terms
+        djh = self.ah * (1 - self.ah) * np.dot(djo, self.wh.T)
+        # print 'djh: {0}'.format(djh)
+        # print 'wh: {0}'.format(self.wh)
+
+        # update hidden weights
+        self.wh = self.wh + (eta * djo * self.ao)
+        # print 'wh: {0}'.format(self.wh)
+
+        # update input weights
+        self.wi = (self.wi.T + (eta * djh * self.ao)).T
+        # print 'wi: {0}'.format(self.wi)
 
 
-    def train(self):
-        pass
+    def train(self, X, y, eps, eta, epochs):
+        for e in xrange(epochs):
+            r = np.arange(X.shape[0])
+            # print 'r: {0}'.format(r)
+            np.random.shuffle(r)
+            # print 'r: {0}'.format(r)
+            for i in r:
+                converged = False
+                while not converged:
+                    # print 'Converging'
+                    self.forward_feed(X[i])
+                    E = 0.5 * (self.ao - y[i])**2
+                    # print 'E[{0}]: {1}'.format(i, E)
+                    if E <= eps:
+                        converged = True
+                    else:
+                        # print 'E > eps'
+                        self.back_propagate(X[i], y[i], eta)
 
 
-    def test(self):
-        pass
+    def test(self, X):
+        for i in xrange(X.shape[0]):
+            print '{0} -> {1}'.format(X[i], self.forward_feed(X[i]))
 
 
     def print_weights(self):
-        pass
+        print self.wi
+        print self.wh
 
 
 def iris():
@@ -118,13 +156,15 @@ def demo():
                   [0]])
 
     # create a network with two input, two hidden, and one output nodes
-    n = NN(2, 2, 1)
+    n = NN(X.shape[1], 2, y.shape[1])
 
     n.forward_feed(X[0])
-    # # train it with some patterns
-    # n.train(pat)
+
+    # epochs: 50 - 100
+    # n.train(X, y, eps=0.01, eta=0.5, epochs=100)
     # # test it
-    # n.test(pat)
+    # n.test(X)
+    # n.print_weights()
 
 
 if __name__ == '__main__':
