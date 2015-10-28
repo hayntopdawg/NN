@@ -1,3 +1,4 @@
+from __future__ import division
 import csv
 import numpy as np
 
@@ -23,18 +24,54 @@ def split_data(filename):
     return np.array(X, dtype='float'), np.array(y)
 
 
-# Used for output layer (N_o)
+# Used for output layer (no)
 def get_num_classes(y):
     return len(set(y))
 
 
+# Removes duplicates and keeps classes in same order
+def class_list(y):
+    known = set()
+    newlist = []
+
+    for c in y:
+        if c in known: continue
+        newlist.append(c)
+        known.add(c)
+
+    return newlist
+
+
 # Converts y into a binary matrix
-def convert_classes(y):
+def y_to_binary(y):
     c_matrix = np.zeros([y.shape[0], get_num_classes(y)])
-    classes = list(set(y))
+    classes = class_list(y)
     for i, c in enumerate(y):
         c_matrix[i, classes.index(c)] = 1
     return c_matrix
+
+
+def get_class(pred):
+    c = np.zeros(pred.shape)
+    if pred.shape[1] > 1:
+        c[0, np.argmax(pred)] = 1
+    else:
+        # prediction is closer to 1 than 0
+        if 1 - pred < pred:
+            c[0] = 1
+    return c
+
+
+# Gets accuracy given predictions and true values
+def accuracy(preds, y):
+    # print preds.shape
+    correct = 0
+    for i, p in enumerate(preds):
+        # print p.shape
+        c = get_class(p)
+        if c.all() == y[i].all():
+            correct += 1
+    return correct / preds.shape[0]
 
 
 def sigmoid(x):
@@ -45,90 +82,105 @@ class NN():
     # Assume only one hidden layer of nh neurons
     def __init__(self, ni, nh, no):
         # number of input, hidden, and output neurons
-        self.ni = ni + 1 # + 1 for the bias node
-        self.nh = nh + 1 # + 1 for the bias node
+        self.ni = ni + 1  # + 1 for the bias node
+        self.nh = nh + 1  # + 1 for the bias node
         self.no = no
 
         # initialize activations
         self.ai = np.ones((self.ni, 1))
-        # print 'ai: {0}'.format(self.ai.shape)
         self.ah = np.ones((self.nh, 1))
-        # print 'ah: {0}'.format(self.ah.shape)
         self.ao = np.ones((self.no, 1))
-        # print 'ao: {0}'.format(self.ao.shape)
 
         # seed random numbers to make calculation deterministic
-        np.random.seed(1)
+        # np.random.seed(1)
 
         # initialize weights with random values between -0.5 and 0.5
-        self.wi = np.random.rand(self.ni, self.nh - 1)  # ni x nh matrix
-        # print 'wi: {0}'.format(self.wi)
-        self.wh = np.random.rand(self.nh, self.no)  # nh x no matrix
-        # print 'wh: {0}'.format(self.wh)
+        self.wi = np.random.rand(self.ni, self.nh - 1) - 0.5  # ni x (nh - 1) matrix
+        self.wh = np.random.rand(self.nh, self.no) - 0.5  # nh x no matrix
 
 
-    def forward_feed(self, xi):
-        # input activations
-        self.ai = np.append(xi, 1)  # add bias node back
-        # print 'ai ({0}): {1}'.format(self.ai.shape, self.ai)
+    # Input Xi vector, feed forward through NN, and get a prediction
+    def feedforward(self, x):
+        # Set input neurons
+        for i in xrange(self.ni - 1):
+            self.ai[i] = x[i]
 
-        # print 'wi: {0}'.format(self.wi)
+        # Calculate hidden neurons
+        for j in xrange(self.nh - 1):
+            s = 0
+            for i in xrange(self.ni):
+                s += self.ai[i] * self.wi[i][j]
+            self.ah[j] = sigmoid(s)
 
-        # hidden activations
-        ah = sigmoid(np.dot(self.wi.T, self.ai))
-        self.ah = np.append(ah, 1)  # add bias node back
-        # print 'ah ({0}): {1}'.format(self.ah.shape, self.ah)
+        # Calculate output neurons
+        for j in xrange(self.no):
+            s = 0
+            for i in xrange(self.nh):
+                s += self.ah[i] * self.wh[i][j]
+            self.ao[j] = sigmoid(s)
 
-        # print 'wh: {0}'.format(self.wh)
-
-        # output activations
-        self.ao = sigmoid(np.dot(self.wh.T, self.ah))
-        # print 'ao: {0}'.format(self.ao)
-        return self.ao
+        return self.ao.copy()
 
 
-    def back_propagate(self, xi, yi, eta):
-        # calculate error terms for outputs
-        djo = (yi - self.ao) * self.ao * (1 - self.ao)
-        # print 'djo: {0}'.format(djo)
+    def backpropagate(self, t, eta):
+        # Case 1
+        # calculate output deltas
+        do = np.ones(self.no)
+        output_deltas = np.ones((self.nh, self.no))
+        for j in xrange(self.no):
+            do[j] = (t[j] - self.ao[j]) * self.ao[j] * (1 - self.ao[j])
+            for i in xrange(self.nh):
+                output_deltas[i][j] = eta * do[j] * self.ah[i]
 
-        # calculate error terms for hidden terms
-        djh = self.ah * (1 - self.ah) * np.dot(djo, self.wh.T)
-        # print 'djh: {0}'.format(djh)
-        # print 'wh: {0}'.format(self.wh)
+        # update hidden->output weights
+        for i in range(self.nh):
+            for j in range(self.no):
+                self.wh[i][j] += output_deltas[i][j]
 
-        # update hidden weights
-        self.wh = self.wh + (eta * djo * self.ao)
-        # print 'wh: {0}'.format(self.wh)
+        # Case 2
+        # calculate hidden deltas
+        dh = np.ones(self.nh - 1)
+        hidden_deltas = np.ones((self.ni, self.nh - 1))
+        for j in xrange(self.nh - 1):
+            s = 0
+            for k in xrange(self.no):
+                s += do[k] * self.wh[j][k]
+            dh[j] = self.ah[j] * (1 - self.ah[j]) * s
+            for i in xrange(self.ni):
+                hidden_deltas[i][j] = eta * dh[j] * self.ai[i]
 
-        # update input weights
-        self.wi = (self.wi.T + (eta * djh * self.ao)).T
-        # print 'wi: {0}'.format(self.wi)
+        # update input->hidden weights
+        for i in range(self.ni):
+            for j in range(self.nh - 1):
+                self.wi[i][j] += hidden_deltas[i][j]
 
 
     def train(self, X, y, eps, eta, epochs):
-        for e in xrange(epochs):
+        """
+        :param eps:
+        :param eta: positive constant (learning rate)
+        :param epochs:
+        """
+        for e in xrange(epochs - 1):
             r = np.arange(X.shape[0])
-            # print 'r: {0}'.format(r)
             np.random.shuffle(r)
-            # print 'r: {0}'.format(r)
             for i in r:
                 converged = False
+                iter = 0
                 while not converged:
-                    # print 'Converging'
-                    self.forward_feed(X[i])
-                    E = 0.5 * (self.ao - y[i])**2
-                    # print 'E[{0}]: {1}'.format(i, E)
+                    iter += 1
+                    y_hat = self.feedforward(X[i])
+                    E = 0.5 * (np.linalg.norm(y_hat.T - y[i]) ** 2)
                     if E <= eps:
                         converged = True
                     else:
-                        # print 'E > eps'
-                        self.back_propagate(X[i], y[i], eta)
+                        if iter % 1000 == 0:
+                            print E
+                        self.backpropagate(y[i], eta)
 
 
-    def test(self, X):
-        for i in xrange(X.shape[0]):
-            print '{0} -> {1}'.format(X[i], self.forward_feed(X[i]))
+    def predict(self, X):
+        return self.feedforward(X).T
 
 
     def print_weights(self):
@@ -139,12 +191,73 @@ class NN():
 def iris():
     # Input (X) and target (y) datasets
     X, y = split_data('iris.data.txt')
+
     # Convert y into a binary matrix
-    c = convert_classes(y)
-    # Input layer is X_i
+    c = y_to_binary(y)
+
+    # Create NN
+    n = NN(X.shape[1], X.shape[1], c.shape[1])
+
+    # Train NN
+    n.train(X, c, eps=0.1, eta=0.1, epochs=10)
+
+    # Test NN
+    preds = []
+    for i in xrange(X.shape[0]):
+        pred = n.predict(X[i])
+        preds.append(pred)
+        print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+
+    print "Accuracy: {0}".format(accuracy(np.array(preds), c))
 
 
-def demo():
+def iris_virginica():
+    # Input (X) and target (y) datasets
+    X, y = split_data('iris-virginica.txt')
+
+    # Convert y into a binary matrix
+    c = y_to_binary(y)
+
+    # Create NN
+    n = NN(X.shape[1], X.shape[1], c.shape[1])
+
+    # Train NN
+    n.train(X, c, eps=0.01, eta=0.1, epochs=50)
+
+    # Test NN
+    preds = []
+    for i in xrange(X.shape[0]):
+        pred = n.predict(X[i])
+        preds.append(pred)
+        print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+
+    print "Accuracy: {0}".format(accuracy(np.array(preds), c))
+
+
+def iris_versicolor():
+    # Input (X) and target (y) datasets
+    X, y = split_data('iris-versicolor.txt')
+
+    # Convert y into a binary matrix
+    c = y_to_binary(y)
+
+    # Create NN
+    n = NN(X.shape[1], X.shape[1], c.shape[1])
+
+    # Train NN
+    n.train(X, c, eps=0.01, eta=0.1, epochs=50)
+
+    # Test NN
+    preds = []
+    for i in xrange(X.shape[0]):
+        pred = n.predict(X[i])
+        preds.append(pred)
+        print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+
+    print "Accuracy: {0}".format(accuracy(np.array(preds), c))
+
+
+def XOR_NN():
     # Teach network XOR function
     X = np.array([[0, 0],
                   [0, 1],
@@ -158,14 +271,51 @@ def demo():
     # create a network with two input, two hidden, and one output nodes
     n = NN(X.shape[1], 2, y.shape[1])
 
-    n.forward_feed(X[0])
+    # epochs: 50 - 100, eta: 0.1 - 0.5
+    n.train(X, y, eps=0.001, eta=0.4, epochs=500)
 
-    # epochs: 50 - 100
-    # n.train(X, y, eps=0.01, eta=0.5, epochs=100)
-    # # test it
-    # n.test(X)
+    # test it
+    preds = []
+    for i in xrange(X.shape[0]):
+        pred = n.predict(X[i])
+        preds.append(pred)
+        print '{0} -> {1} ~ {2}'.format(X[i], pred, y[i])
+
+    print accuracy(np.array(preds), y)
+    # n.print_weights()
+
+
+def AND_NN():
+    # Teach network AND function
+    X = np.array([[0, 0],
+                  [0, 1],
+                  [1, 0],
+                  [1, 1]])
+    y = np.array([[0, 1],
+                  [1, 0],
+                  [1, 0],
+                  [1, 0]])
+
+    # create a network with two input, two hidden, and one output nodes
+    n = NN(X.shape[1], 2, y.shape[1])
+
+    # epochs: 50 - 100, eta: 0.1 - 0.5
+    n.train(X, y, eps=0.001, eta=0.4, epochs=500)
+
+    # test it
+    preds = []
+    for i in xrange(X.shape[0]):
+        pred = n.predict(X[i])
+        preds.append(pred)
+        # print '{0} -> {1} ~ {2}'.format(X[i], pred, y[i])
+
+    print accuracy(np.array(preds), y)
     # n.print_weights()
 
 
 if __name__ == '__main__':
-    demo()
+    # XOR_NN()
+    # AND_NN()
+    iris()
+    # iris_virginica()
+    # iris_versicolor()
