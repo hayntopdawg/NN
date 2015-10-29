@@ -1,6 +1,7 @@
 from __future__ import division
 import csv
 import numpy as np
+import sys
 
 __author__ = 'Jamie Fujimoto'
 # Used code from:
@@ -157,35 +158,30 @@ class NN():
 
     def train(self, X, y, eps, eta, epochs):
         """
-        :param eps:
+        :param eps: epsilon value for convergence of the backprop inner loop
         :param eta: positive constant (learning rate)
-        :param epochs:
+        :param epochs: number of runs through the entire dataset
         """
         for e in xrange(epochs - 1):
             r = np.arange(X.shape[0])
             np.random.shuffle(r)
             for i in r:
                 converged = False
-                iter = 0
+                itr = 0
                 while not converged:
-                    iter += 1
+                    itr += 1
                     y_hat = self.feedforward(X[i])
                     E = 0.5 * (np.linalg.norm(y_hat.T - y[i]) ** 2)
                     if E <= eps:
                         converged = True
                     else:
-                        if iter % 1000 == 0:
+                        if itr % 1000 == 0:
                             print E
                         self.backpropagate(y[i], eta)
 
 
     def predict(self, X):
         return self.feedforward(X).T
-
-
-    def print_weights(self):
-        print self.wi
-        print self.wh
 
 
 def iris():
@@ -199,7 +195,7 @@ def iris():
     n = NN(X.shape[1], X.shape[1], c.shape[1])
 
     # Train NN
-    n.train(X, c, eps=0.1, eta=0.1, epochs=10)
+    n.train(X, c, eps=0.001, eta=0.1, epochs=100)
 
     # Test NN
     preds = []
@@ -313,9 +309,55 @@ def AND_NN():
     # n.print_weights()
 
 
+def script():
+    filename = sys.argv[1]
+    nh = int(sys.argv[2])
+    eps = float(sys.argv[3])
+    eta = float(sys.argv[4])
+    epochs = int(sys.argv[5])
+
+    # Input (X) and target (y) datasets
+    X, y = split_data(filename)
+
+    # Convert y into a binary matrix
+    c = y_to_binary(y)
+
+    # Create NN
+    n = NN(X.shape[1], nh, c.shape[1])
+
+    # Train NN
+    n.train(X, c, eps=eps, eta=eta, epochs=epochs)
+
+    # Test NN
+    preds = []
+    for i in xrange(X.shape[0]):
+        pred = n.predict(X[i])
+        preds.append(pred)
+        print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+
+    acc = accuracy(np.array(preds), c)
+    print "Accuracy: {0}".format(acc)
+
+    with open("assign3-FUJIMOTO-JAMIE.txt", "w") as f:
+        # Write inputs
+        f.write("Dataset: {0}\n".format(filename))
+        f.write("Hidden Neurons: {0}\n".format(nh))
+        f.write("Epsilon: {0}\n".format(eps))
+        f.write("Training Rate: {0}\n".format(eta))
+        f.write("Epochs: {0}\n\n".format(epochs))
+
+        # Write weights
+        f.write("Input->Hidden Weights:\n{0}\n".format(n.wi))
+        f.write("Hidden->Output Weights:\n{0}\n\n".format(n.wh))
+
+        # Write accuracy
+        f.write("Accuracy: {0}\n".format(acc * 100))
+
+
 if __name__ == '__main__':
     # XOR_NN()
     # AND_NN()
-    iris()
+    # iris()
     # iris_virginica()
     # iris_versicolor()
+    script()  # run from command line
