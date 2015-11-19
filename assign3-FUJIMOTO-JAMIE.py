@@ -54,12 +54,19 @@ def y_to_binary(y):
 
 def get_class(pred):
     c = np.zeros(pred.shape)
-    if pred.shape[1] > 1:
-        c[0, np.argmax(pred)] = 1
-    else:
-        # prediction is closer to 1 than 0
-        if 1 - pred < pred:
-            c[0] = 1
+    c[0, np.argmax(pred)] = 1
+
+    # if pred.shape[1] > 1:
+    #     c[0, np.argmax(pred)] = 1
+    # else:
+    #     # prediction is closer to 1 than 0
+    #     if 1 - pred < pred:
+    #         c[0] = 1
+
+    # prediction is closer to 1 than 0
+    # for i in xrange(pred.shape[1]):
+    #     if 1 - pred[:,i] < pred[:,i]:
+    #         c[:,i] = 1
     return c
 
 
@@ -69,8 +76,14 @@ def accuracy(preds, y):
     correct = 0
     for i, p in enumerate(preds):
         # print p.shape
-        c = get_class(p)
-        if c.all() == y[i].all():
+        # c = get_class(p)
+        # print p[0], y[i]
+        flag = True  # try setting this to False and reverse the logic
+        for e, f in zip(p[0], y[i]):
+            if e != f:
+                flag = False
+        # if p[0].all() == y[i].all():
+        if flag == True:
             correct += 1
     return correct / preds.shape[0]
 
@@ -178,13 +191,14 @@ class NN():
                         if itr % 1000 == 0:
                             print E
                         self.backpropagate(y[i], eta)
+                if converged == True: break
 
 
     def predict(self, X):
         return self.feedforward(X).T
 
 
-def iris():
+def iris(nh, eps, eta, epochs):
     # Input (X) and target (y) datasets
     X, y = split_data('iris.data.txt')
 
@@ -192,22 +206,26 @@ def iris():
     c = y_to_binary(y)
 
     # Create NN
-    n = NN(X.shape[1], X.shape[1], c.shape[1])
+    # n = NN(X.shape[1], X.shape[1], c.shape[1])
+    n = NN(X.shape[1], nh, c.shape[1])
 
     # Train NN
-    n.train(X, c, eps=0.001, eta=0.1, epochs=100)
+    n.train(X, c, eps=eps, eta=eta, epochs=epochs)
 
     # Test NN
     preds = []
     for i in xrange(X.shape[0]):
         pred = n.predict(X[i])
-        preds.append(pred)
-        print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+        # preds.append(pred)
+        # print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+        bin_pred = get_class(pred)
+        preds.append(bin_pred)
+        print '{0} -> {1} = {2} ~ {3}'.format(X[i], pred, bin_pred, y[i])
 
     print "Accuracy: {0}".format(accuracy(np.array(preds), c))
 
 
-def iris_virginica():
+def iris_virginica(nh, eps, eta, epochs):
     # Input (X) and target (y) datasets
     X, y = split_data('iris-virginica.txt')
 
@@ -215,22 +233,26 @@ def iris_virginica():
     c = y_to_binary(y)
 
     # Create NN
-    n = NN(X.shape[1], X.shape[1], c.shape[1])
+    # n = NN(X.shape[1], X.shape[1], c.shape[1])
+    n = NN(X.shape[1], nh, c.shape[1])
 
     # Train NN
-    n.train(X, c, eps=0.01, eta=0.1, epochs=50)
+    n.train(X, c, eps=eps, eta=eta, epochs=epochs)
 
     # Test NN
     preds = []
     for i in xrange(X.shape[0]):
         pred = n.predict(X[i])
-        preds.append(pred)
-        print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+        # preds.append(pred)
+        # print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+        bin_pred = get_class(pred)
+        preds.append(bin_pred)
+        print '{0} -> {1} = {2} ~ {3}'.format(X[i], pred, bin_pred, y[i])
 
     print "Accuracy: {0}".format(accuracy(np.array(preds), c))
 
 
-def iris_versicolor():
+def iris_versicolor(nh, eps, eta, epochs):
     # Input (X) and target (y) datasets
     X, y = split_data('iris-versicolor.txt')
 
@@ -238,22 +260,26 @@ def iris_versicolor():
     c = y_to_binary(y)
 
     # Create NN
-    n = NN(X.shape[1], X.shape[1], c.shape[1])
+    # n = NN(X.shape[1], X.shape[1], c.shape[1])
+    n = NN(X.shape[1], nh, c.shape[1])
 
     # Train NN
-    n.train(X, c, eps=0.01, eta=0.1, epochs=50)
+    n.train(X, c, eps=eps, eta=eta, epochs=epochs)
 
     # Test NN
     preds = []
     for i in xrange(X.shape[0]):
         pred = n.predict(X[i])
-        preds.append(pred)
-        print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+        # preds.append(pred)
+        # print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+        bin_pred = get_class(pred)
+        preds.append(bin_pred)
+        print '{0} -> {1} = {2} ~ {3}'.format(X[i], pred, bin_pred, y[i])
 
     print "Accuracy: {0}".format(accuracy(np.array(preds), c))
 
 
-def XOR_NN():
+def XOR_NN(nh, eps, eta, epochs):
     # Teach network XOR function
     X = np.array([[0, 0],
                   [0, 1],
@@ -265,17 +291,19 @@ def XOR_NN():
                   [0]])
 
     # create a network with two input, two hidden, and one output nodes
-    n = NN(X.shape[1], 2, y.shape[1])
+    n = NN(X.shape[1], nh, y.shape[1])
 
     # epochs: 50 - 100, eta: 0.1 - 0.5
-    n.train(X, y, eps=0.001, eta=0.4, epochs=500)
+    n.train(X, y, eps=eps, eta=eta, epochs=epochs)
 
     # test it
     preds = []
     for i in xrange(X.shape[0]):
         pred = n.predict(X[i])
-        preds.append(pred)
-        print '{0} -> {1} ~ {2}'.format(X[i], pred, y[i])
+        # preds.append(pred)
+        c = get_class(pred)
+        preds.append(c)
+        print '{0} -> {1} = {2} ~ {3}'.format(X[i], pred, c, y[i])
 
     print accuracy(np.array(preds), y)
     # n.print_weights()
@@ -296,14 +324,16 @@ def AND_NN():
     n = NN(X.shape[1], 2, y.shape[1])
 
     # epochs: 50 - 100, eta: 0.1 - 0.5
-    n.train(X, y, eps=0.001, eta=0.4, epochs=500)
+    n.train(X, y, eps=0.001, eta=0.4, epochs=5)
 
     # test it
     preds = []
     for i in xrange(X.shape[0]):
         pred = n.predict(X[i])
-        preds.append(pred)
-        # print '{0} -> {1} ~ {2}'.format(X[i], pred, y[i])
+        # preds.append(pred)
+        c = get_class(pred)
+        preds.append(c)
+        print '{0} -> {1} = {2} ~ {3}'.format(X[i], pred, c, y[i])
 
     print accuracy(np.array(preds), y)
     # n.print_weights()
@@ -332,8 +362,11 @@ def script():
     preds = []
     for i in xrange(X.shape[0]):
         pred = n.predict(X[i])
-        preds.append(pred)
-        print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+        # preds.append(pred)
+        # print "{0} -> {1} ~ {2}:{3}".format(X[i], pred, c[i], y[i])
+        bin_pred = get_class(pred)
+        preds.append(bin_pred)
+        print '{0} -> {1} = {2} ~ {3}'.format(X[i], pred, bin_pred, y[i])
 
     acc = accuracy(np.array(preds), c)
     print "Accuracy: {0}".format(acc)
@@ -355,9 +388,10 @@ def script():
 
 
 if __name__ == '__main__':
-    # XOR_NN()
+    nh, eps, eta, epochs = 10, 0.001, 0.4, 300
+    # XOR_NN(nh, eps, eta, epochs)
     # AND_NN()
-    # iris()
-    # iris_virginica()
-    # iris_versicolor()
-    script()  # run from command line
+    # iris(nh, eps, eta, epochs)
+    iris_virginica(nh, eps, eta, epochs)
+    # iris_versicolor(nh, eps, eta, epochs)
+    # script()  # run from command line
